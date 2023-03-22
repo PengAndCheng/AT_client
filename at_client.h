@@ -12,7 +12,6 @@ typedef enum
     URC, //不是状态 只是写在这里 为了不和前面的状态号冲突
 }At_client_state_m;
 
-
 //16*4=64 一条CMD占用64字节 有些变量可以抽出，但是意义不大 一套操作变量不需要多少
 typedef struct At_cmd
 {
@@ -59,7 +58,7 @@ typedef struct At_features
     void (*cb2)(void);
 }At_features;
 
-
+void at_csq_get(void);
 
 void at_client_run(void);
 At_client_state_m at_client_state_get(void);

@@ -14,7 +14,7 @@ extern int recv_relay_buf_size;
 
 extern At_client_state_m at_client_state;
 
-extern void at_ppp_input(uint8_t* buffer, int buffer_len);
+
 #define at_ppp_recv_debug 0
 static int recv_nb = 0;
 void at_ppp_recv(char c){
@@ -32,7 +32,7 @@ void at_ppp_recv(char c){
         printf(" .\r\n");
 #endif /* #if at_ppp_recv_debug */
 
-        at_ppp_input(buf,recv_nb);
+        //extern void at_ppp_input(uint8_t* buffer, int buffer_len);at_ppp_input(buf,recv_nb);
         recv_nb = 0;//很重要
     }
 }
@@ -64,7 +64,6 @@ int at_ppp_is_normal(void){
     }
     return 0;
 }
-
 
 
 

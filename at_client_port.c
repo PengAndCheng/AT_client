@@ -1,8 +1,7 @@
+#include <stdio.h>
+
 #include "at_client_port.h"
 #include "at_client_cfg.h"
-
-
-#include "board_uart.h"
 
 #include "at_client.h"
 
@@ -14,6 +13,15 @@
 static uint8_t qdata[AT_CLIENT_PORT_INPUT_LOOPQUEUE_SIZE];
 static int qhead = 0;
 static int qend = 0;
+//使用接收信号量
+#if USE_RTOS
+#define QSEM 1
+#else
+#define QSEM 0
+#endif
+#if QSEM
+static struct rt_semaphore qsem;
+#endif /* #if QSEM */
 void at_client_port_input_loopQueue(uint8_t* data, int len){
     for (int i = 0; i < len; i++)
     {
@@ -24,10 +32,20 @@ void at_client_port_input_loopQueue(uint8_t* data, int len){
             qhead = (qhead+1)%AT_CLIENT_PORT_INPUT_LOOPQUEUE_SIZE;
         }
     }
-    
+#if QSEM
+    rt_sem_release(&qsem);
+#endif /* #if QSEM */
 }
 
-int at_client_port_take_byte(uint8_t* byte){
+int at_client_port_take_byte(uint8_t* byte, unsigned int timeout){
+#if QSEM
+    if (qend == qhead)
+    {
+        rt_sem_take(&qsem, timeout);
+    }
+#endif /* #if QSEM */
+
+
     int len = 0;
     if (qend >= qhead)
     {
@@ -71,9 +89,12 @@ void at_client_port_output(uint8_t* data, int len){
 }
 
 void at_client_port_init(void){
-    AT_CLIENT_UART_INIT();
+#if QSEM
+    rt_sem_init(&qsem, "qsem", 0, RT_IPC_FLAG_FIFO);
+#endif /* #if QSEM */
     qhead = 0;
     qend = 0;
+    AT_CLIENT_UART_INIT();
     AT_CLIENT_UART_SET_RECEIVE_CALLBACK_FUNCTION(at_client_port_input_loopQueue);
     printf("at client port init.\r\n");
 }

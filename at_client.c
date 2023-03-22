@@ -11,6 +11,7 @@
 #define FN_NULL 0 //空函数
 #define FN_BLOCK 0xFFFFFFFF
 static At_client_state_m at_client_state = 0;
+static At_client_state_m at_client_state_last = 0; //多一个历史变量是为了不用去查找回滚
 #define at_state_his_size AT_STATE_HIS_SIZE
 static At_client_state_m at_state_his[at_state_his_size]={0}; //状态历史记录 循环列队的记录
 static int at_state_his_head=0;//假如增加第一个数据头不动
@@ -31,6 +32,7 @@ int at_client_is_relay_state(void){
     return 0;
 }
 
+
 void at_client_state_enter(At_client_state_m state){
     At_client_state_m excessive_state = at_client_state;//缓存一下当前状态
     At_client_state_m new_state = state; //缓存一下将要改变的心状态 可能会出现拦截逻辑导致最终改的状态不是想要的状态
@@ -42,6 +44,7 @@ void at_client_state_enter(At_client_state_m state){
     cmd[at_client_state].exec_this_count = 0;//这个参数很重要决定是否重新进入第一次执行
     //记录历史状态
     at_state_his[at_state_his_end] = excessive_state; //最新记录的是上一个状态 方便读取上一次状态 也省掉一个记录当前状态的内存
+    at_client_state_last = at_state_his[at_state_his_end];
     at_state_his_end = (at_state_his_end+1)%at_state_his_size;
     if (at_state_his_end == at_state_his_head)
     {
@@ -82,9 +85,18 @@ void state_enter_##_state##(void){\
 void state_enter_STATE_NON(void){
     at_client_state_enter(STATE_NON);
 }
+//补充一个返回上一次状态
+void state_enter_last(void){
+    if (at_client_state_last == at_client_state)
+    {
+        //这里的话相当于异常了
+        printf("state_enter_last error.\n");
+        at_client_state_last = AT_OK;
+    }
+    at_client_state_enter(at_client_state_last);
+}
 
-
-void at_cmd_init(void){
+static void at_cmd_init(void){
     //补充默认状态名字
     state_name[STATE_NON] = "STATE_NON";
 
@@ -113,12 +125,12 @@ void at_cmd_init(void){
 
 
 
-
-void at_client_cmd_exec(void){
+//返回下一次执行的tick间隔
+static unsigned int at_client_cmd_exec(void){
     if (at_client_state == STATE_NON || at_client_state == NOT_EXEC_CMD_STATE)
     {
         //默认不执行 需要动态激活 也可以撤销
-        return;
+        return 0;
     }
 
     //判断是否第一次进入命令 是的话等待一个间隔
@@ -139,8 +151,14 @@ void at_client_cmd_exec(void){
             cmd[at_client_state].exec_this_count++;
             cmd[at_client_state].exec_all_count++;
             cmd[at_client_state].exec_tick = AT_CLIENT_TICK_GET;
+            return 0;
+        }else{
+            #if USE_RTOS
+            return at_client_tick_Notimeout(cmd[at_client_state].enter_state_tick,cmd[at_client_state].first_exec_interval_tick);
+            #else
+            return 0;
+            #endif /* #if USE_RTOS */
         }
-        return;
     }
 
     //后续间隔执行： 已经执行过一遍 && 不超过可执行次数 exec_sum至少为1 写0功能也等同于1
@@ -160,8 +178,14 @@ void at_client_cmd_exec(void){
             cmd[at_client_state].exec_this_count++;
             cmd[at_client_state].exec_all_count++;
             cmd[at_client_state].exec_tick = AT_CLIENT_TICK_GET;
+            return 0;
+        }else{
+            #if USE_RTOS
+            return at_client_tick_Notimeout(cmd[at_client_state].exec_tick,cmd[at_client_state].exec_interval_tick);
+            #else
+            return 0;
+            #endif /* #if USE_RTOS */
         }
-        return;
     }
 
     //超时检测
@@ -195,9 +219,17 @@ void at_client_cmd_exec(void){
                 }
                 cmd[at_client_state].exec_timeout_tick = AT_CLIENT_TICK_GET;
             }
+            return 0;
+        }else{
+            #if USE_RTOS
+            return at_client_tick_Notimeout(cmd[at_client_state].exec_tick,cmd[at_client_state].exec_interval_tick);
+            #else
+            return 0;
+            #endif /* #if USE_RTOS */
         }
-        return;
     }
+
+    return 0;
 }
 
 
@@ -222,7 +254,18 @@ static int new_line_size = 0;
 char * recv_relay_buf = 0;
 int recv_relay_buf_size = 0;
 
-void at_client_recv_exec_init(void){
+static int csq_rssi = 0;
+static int csq_ber = 0;
+void at_csq_get(void){
+    sscanf(new_line,"+CSQ: %d,%d",&csq_rssi,&csq_ber);
+    printf("csq_rssi=%d, csq_ber=%d.\r\n",csq_rssi,csq_ber);
+    if (csq_rssi > 0 && csq_rssi <=31)
+    {
+        state_enter_last();
+    }
+}
+
+static void at_client_recv_exec_init(void){
     //计算处所有需要查找的特征长度
 #define AT_FEATURES(_enum_name, _state, _features1, _features2, _cb, _cb2) \
     features[_enum_name].index = _enum_name;\
@@ -264,10 +307,10 @@ void at_client_recv_exec_init(void){
 static char prvRchar = 0;
 static char newRchar = 0;
 static int newRchar_count = 0;
-void at_client_recv_exec(void){
+static void at_client_recv_exec(unsigned int timeout){
 
     char recvChar = 0;
-    if (!at_client_port_take_byte((uint8_t*)&recvChar))
+    if (!at_client_port_take_byte((uint8_t*)&recvChar,timeout))
     {
         return;
     }
@@ -392,7 +435,7 @@ void at_client_recv_exec(void){
 }
 
 
-void at_client_init(void){
+static void at_client_init(void){
     at_client_port_init();
     at_cmd_init();
     at_client_recv_exec_init();
@@ -403,12 +446,46 @@ void at_client_run(void){
     if (at_client_is_init == 0)
     {
         at_client_is_init = 1;
+        //at客户端初始化
         at_client_init();
+        //at客户端第一次进入状态
         INITIALIZATION_COMPLETE_STATE_ENTER;
+        //记录第一次last状态
+        at_client_state_last = at_client_state_get();
     }
     
-    at_client_cmd_exec();
-    at_client_recv_exec();
+    //执行CMD命令, 返回的tick为下一次可执行的间隔
+    unsigned int cmd_interval_tick = at_client_cmd_exec();
+
+    #if USE_RTOS
+    if (cmd_interval_tick == 0)
+    {
+        //当cmd_interval_tick=0时，说明at_client_cmd_exec没有马上需要执行下一次，给个默认超时时间，不一定是宏DEFAULT_FIRST_EXEC_INTERVAL
+        cmd_interval_tick = DEFAULT_FIRST_EXEC_INTERVAL;
+        #if 0
+        if (RECV_USE_RELAY && RECV_RELAY_STATE == at_client_state){
+            //非CMD模式
+        }else{
+            printf("cmd_interval_tick default %d.\n",cmd_interval_tick);
+        }
+        #endif
+    }
+    #endif /* #if USE_RTOS */
+    //等待接收执行状态转移或者回调函数
+    at_client_recv_exec(cmd_interval_tick);
+
+
+    if (RECV_USE_RELAY && RECV_RELAY_STATE == at_client_state){
+        //非CMD模式
+    }else{
+        //每5秒查询一下信号质量
+        static unsigned int csqTick = 0;
+        if ((AT_CLIENT_TICK_GET - csqTick > 5000 || csqTick == 0) && at_client_state > ATQCCID)
+        {
+            state_enter_ATCSQ();//这里会打断其他命令事件，只是在命令模式下使用影响不大，对事件有要求的自行加锁
+            csqTick = AT_CLIENT_TICK_GET;
+        }
+    }
 }
 
 

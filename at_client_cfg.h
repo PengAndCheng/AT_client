@@ -44,4 +44,12 @@
 //转发状态下的转发函数
 #define RECV_RELAY_FN(CHAR) at_ppp_recv(CHAR)
 
+//使用RTOS
+#define USE_RTOS 1
+#if USE_RTOS
+#include <rtthread.h>
+//实现延时函数
+#define AT_CLIENT_MDELAY_M(MS) rt_thread_mdelay(MS);
+#endif
+
 #endif /* _AT_CLIENT_CFG_H_ */

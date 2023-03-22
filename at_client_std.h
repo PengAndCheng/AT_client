@@ -8,7 +8,7 @@
 //当_allow_timeout_sum=0时永远不会进入快速进入_exec_non_allow_timeout1 2
 //ATI命令用于测试回调2
 
-AT_CMD(REBOOT, "0", at_client_OFF, FN_NULL, DEFAULT_FIRST_EXEC_INTERVAL, 1, 1500, at_client_ON, FN_NULL, 2, state_enter_AT, FN_NULL) //allow_timeout_sum 必须为2 1执行了ON 统计+1时 exec_non_allow_timeout 不能拦截1 只能拦截2
+AT_CMD(REBOOT, "0", at_client_OFF, FN_NULL, DEFAULT_FIRST_EXEC_INTERVAL, 1, 1500, at_client_ON, FN_NULL, 2, state_enter_AT, FN_NULL) //allow_timeout_sum必须为2； 1是执行了at_client_ON统计+1； exec_non_allow_timeout不能拦截1只能拦截2
 AT_CMD(AT, "AT", send_simple_cmd_AT, FN_NULL, DEFAULT_FIRST_EXEC_INTERVAL, 20, 1000, state_enter_REBOOT, FN_NULL, 0, FN_NULL, FN_NULL)
 AT_CMD(ATI, "ATI", FN_NULL, send_simple_cmd_ATI, DEFAULT_FIRST_EXEC_INTERVAL, 5, 1000, FN_NULL, state_enter_REBOOT, 0, FN_NULL ,FN_NULL)
 AT_CMD(ATCPIN, "AT+CPIN?", send_simple_cmd_ATCPIN, FN_NULL, DEFAULT_FIRST_EXEC_INTERVAL, 20, 1000, state_enter_REBOOT, FN_NULL, 0, FN_NULL ,FN_NULL)
@@ -20,6 +20,10 @@ AT_CMD(ATCGDCONT, "AT+CGDCONT=1,\"IP\",\"CMNET\"", send_simple_cmd_ATCGDCONT, FN
 AT_CMD(ATD99, "ATD*99#", send_simple_cmd_ATD99, FN_NULL, DEFAULT_FIRST_EXEC_INTERVAL, 5, 1000, state_enter_REBOOT, FN_NULL, 0, FN_NULL ,FN_NULL)
 AT_CMD(PPPPRV, "0", FN_NULL, state_enter_PPP, 1000, 0, 1000, FN_NULL, FN_NULL, 0, FN_NULL ,FN_NULL)
 AT_CMD(PPP, "0", FN_NULL, FN_NULL, FN_BLOCK, FN_BLOCK, FN_BLOCK, FN_NULL, FN_NULL, 0, FN_NULL ,FN_NULL)
+
+//查询信号质量
+//AT_CMD(状态, at简单指令, 发送at简单指令1函数, 发送at指令2函数, 第一次执行离上次执行间隔, 可以执行次数最小1, 每次执行间隔, 超时函数1, 超时函数2, 允许超时次数, 超时超限次数函数1 ,超时超限次数函数2)
+AT_CMD(ATCSQ, "AT+CSQ", send_simple_cmd_ATCSQ, FN_NULL, DEFAULT_FIRST_EXEC_INTERVAL, 3, 3000, FN_NULL, FN_NULL, 2, state_enter_ATCSQ ,FN_NULL)
 
 #endif /* #ifdef AT_CMD */
 #undef AT_CMD
@@ -41,6 +45,9 @@ AT_FEATURES(ATCGREG_OK, ATCGREG, "+CGREG: 0,1", "0", FN_NULL, state_enter_ATCGDC
 AT_FEATURES(ATCGREG2_OK, ATCGREG, "+CGREG: 0,5", "0", FN_NULL, state_enter_ATCGDCONT)
 AT_FEATURES(ATCGDCONT_OK, ATCGDCONT, "AT+CGDCONT=1", "0", FN_NULL, state_enter_ATD99)
 AT_FEATURES(ATD99_OK, ATD99, "0", "CONNECT", FN_NULL, state_enter_PPPPRV)
+
+//得到信号质量 知道信号稳定才会跳出这一步
+AT_FEATURES(ATCSQ_OK, ATCSQ, "0", "+CSQ: ", at_csq_get, FN_NULL)
 
 #endif
 #undef AT_FEATURES
