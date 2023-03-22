@@ -32,7 +32,7 @@ void at_ppp_recv(char c){
         printf(" .\r\n");
 #endif /* #if at_ppp_recv_debug */
 
-        //extern void at_ppp_input(uint8_t* buffer, int buffer_len);at_ppp_input(buf,recv_nb);
+        extern void at_ppp_input(uint8_t* buffer, int buffer_len);at_ppp_input(buf,recv_nb);
         recv_nb = 0;//很重要
     }
 }

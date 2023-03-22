@@ -480,7 +480,7 @@ void at_client_run(void){
     }else{
         //每5秒查询一下信号质量
         static unsigned int csqTick = 0;
-        if ((AT_CLIENT_TICK_GET - csqTick > 5000 || csqTick == 0) && at_client_state > ATQCCID)
+        if ((AT_CLIENT_TICK_GET - csqTick > 5000 || csqTick == 0) && at_client_state > ATQCCID && at_client_state != ATCSQ)
         {
             state_enter_ATCSQ();//这里会打断其他命令事件，只是在命令模式下使用影响不大，对事件有要求的自行加锁
             csqTick = AT_CLIENT_TICK_GET;

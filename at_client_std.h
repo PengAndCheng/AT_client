@@ -23,7 +23,7 @@ AT_CMD(PPP, "0", FN_NULL, FN_NULL, FN_BLOCK, FN_BLOCK, FN_BLOCK, FN_NULL, FN_NUL
 
 //查询信号质量
 //AT_CMD(状态, at简单指令, 发送at简单指令1函数, 发送at指令2函数, 第一次执行离上次执行间隔, 可以执行次数最小1, 每次执行间隔, 超时函数1, 超时函数2, 允许超时次数, 超时超限次数函数1 ,超时超限次数函数2)
-AT_CMD(ATCSQ, "AT+CSQ", send_simple_cmd_ATCSQ, FN_NULL, DEFAULT_FIRST_EXEC_INTERVAL, 3, 3000, FN_NULL, FN_NULL, 2, state_enter_ATCSQ ,FN_NULL)
+AT_CMD(ATCSQ, "AT+CSQ", send_simple_cmd_ATCSQ, FN_NULL, DEFAULT_FIRST_EXEC_INTERVAL, 2, 1000, FN_NULL, FN_NULL, 2, state_enter_last ,FN_NULL)
 
 #endif /* #ifdef AT_CMD */
 #undef AT_CMD
