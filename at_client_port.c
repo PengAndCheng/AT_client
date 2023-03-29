@@ -66,7 +66,7 @@ int at_client_port_take_byte(uint8_t* byte, unsigned int timeout){
 
 
 void at_client_port_output(uint8_t* data, int len){
-    if (RECV_USE_RELAY && RECV_RELAY_STATE == at_client_state_get())
+    if (USE_RELAY_STATE && RELAY_STATE == at_client_state_get())
     {
         //非CMD模式
     }else{

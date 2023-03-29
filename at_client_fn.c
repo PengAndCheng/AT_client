@@ -20,7 +20,8 @@ static int recv_nb = 0;
 void at_ppp_recv(char c){
     buf[recv_nb] = c;
     recv_nb++;
-    if (recv_nb == buf_size || ( (recv_nb>1)&&(c==0x7E) ))
+    if (recv_nb == buf_size || ( (recv_nb>1)&&(c==0x7E) ))//缓解协议栈压力使用这句
+	//if ( recv_nb == buf_size || recv_nb >= 1 )
     {
         //可以将数据输入PPP协议栈
 #if at_ppp_recv_debug
@@ -35,6 +36,16 @@ void at_ppp_recv(char c){
         extern void at_ppp_input(uint8_t* buffer, int buffer_len);at_ppp_input(buf,recv_nb);
         recv_nb = 0;//很重要
     }
+}
+
+void at_ppp_enter(void){
+	extern void PPPOS_connect(void);
+	PPPOS_connect();
+}
+
+void at_ppp_quit(void){
+	extern void PPPOS_disconnect(void);
+	PPPOS_disconnect();
 }
 
 #define at_ppp_send_debug 0
