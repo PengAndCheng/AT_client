@@ -38,11 +38,15 @@
 //该状态下不在进行CMD执行 效果同STATE_NON 如果没有就填STATE_NON 在CMD测也可以使用阻塞时间 增加这个功能就是减少不必要的延时检测
 #define NOT_EXEC_CMD_STATE PPP
 //启用转发功能
-#define RECV_USE_RELAY 1
+#define USE_RELAY_STATE 1
 //注网成功后会进入可转发数据状态 进入状态延时在CMD中自行增加yu
-#define RECV_RELAY_STATE PPP
+#define RELAY_STATE PPP
 //转发状态下的转发函数
-#define RECV_RELAY_FN(CHAR) at_ppp_recv(CHAR)
+#define RELAY_RECV_FN(CHAR) at_ppp_recv(CHAR)
+//进入转发状态执行一次
+#define RELAY_STATE_ENTER() at_ppp_enter()
+//退出转发状态执行一次
+#define RELAY_STATE_QUIT() at_ppp_quit()
 
 //使用RTOS
 #define USE_RTOS 1

@@ -25,7 +25,7 @@ At_client_state_m at_client_state_get(void){
 }
 
 int at_client_is_relay_state(void){
-    if (at_client_state == RECV_RELAY_STATE)
+    if (at_client_state == RELAY_STATE)
     {
         return 1;
     }
@@ -38,13 +38,17 @@ void at_client_state_enter(At_client_state_m state){
     At_client_state_m new_state = state; //缓存一下将要改变的心状态 可能会出现拦截逻辑导致最终改的状态不是想要的状态
 
 
-    //最终改变状态
+	//最终改变状态 应为被可以被重复调用来刷新tick 所以历史状态记录有重复的可能
     at_client_state = new_state;
     cmd[at_client_state].enter_state_tick = AT_CLIENT_TICK_GET;//这个参数很重要决定延时执行
     cmd[at_client_state].exec_this_count = 0;//这个参数很重要决定是否重新进入第一次执行
     //记录历史状态
     at_state_his[at_state_his_end] = excessive_state; //最新记录的是上一个状态 方便读取上一次状态 也省掉一个记录当前状态的内存
     at_client_state_last = at_state_his[at_state_his_end];
+		#if USE_RELAY_STATE
+		if(at_client_state_last == RELAY_STATE && at_client_state != RELAY_STATE){RELAY_STATE_QUIT();}
+		if(at_client_state_last != RELAY_STATE && at_client_state == RELAY_STATE){RELAY_STATE_ENTER();}
+		#endif
     at_state_his_end = (at_state_his_end+1)%at_state_his_size;
     if (at_state_his_end == at_state_his_head)
     {
@@ -318,7 +322,7 @@ static void at_client_recv_exec(unsigned int timeout){
     prvRchar=newRchar;
     newRchar = recvChar;
 
-    if (RECV_USE_RELAY && RECV_RELAY_STATE == at_client_state)
+    if (USE_RELAY_STATE && RELAY_STATE == at_client_state)
     {
         //非CMD模式
     }else{
@@ -426,9 +430,9 @@ static void at_client_recv_exec(unsigned int timeout){
 
     __check_feature_end:
     //等于某个状态时将数据newRchar转发 需要自己实现如将接收转给PPP
-    if (RECV_USE_RELAY && NOT_EXEC_CMD_STATE == at_client_state)
+    if (USE_RELAY_STATE && NOT_EXEC_CMD_STATE == at_client_state)
     {
-        RECV_RELAY_FN(newRchar);
+        RELAY_RECV_FN(newRchar);
     }
     
 
@@ -452,6 +456,11 @@ void at_client_run(void){
         INITIALIZATION_COMPLETE_STATE_ENTER;
         //记录第一次last状态
         at_client_state_last = at_client_state_get();
+			
+			//可能模块正处于PPP模式或者+++模式 先退出，代码自行设计
+			//抓包来的，只能说是能用，可以退出PPP
+			uint8_t LCP_Terminate_Request[] = {0x7E, 0xFF, 0x7D, 0x23, 0xC0, 0x21, 0x7D, 0x25, 0x7D, 0x24, 0x7D, 0x20, 0x7D, 0x30, 0x55, 0x73, 0x65, 0x72, 0x20, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0xBE, 0x8B, 0x7E};
+			at_client_port_output(LCP_Terminate_Request, sizeof(LCP_Terminate_Request));
     }
     
     //执行CMD命令, 返回的tick为下一次可执行的间隔
@@ -475,7 +484,7 @@ void at_client_run(void){
     at_client_recv_exec(cmd_interval_tick);
 
 
-    if (RECV_USE_RELAY && RECV_RELAY_STATE == at_client_state){
+    if (USE_RELAY_STATE && RELAY_STATE == at_client_state){
         //非CMD模式
     }else{
         //每5秒查询一下信号质量
