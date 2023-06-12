@@ -59,6 +59,7 @@ typedef struct At_features
 }At_features;
 
 void at_csq_get(void);
+void at_csq_return(void);
 
 void at_client_run(void);
 At_client_state_m at_client_state_get(void);

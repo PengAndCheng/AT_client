@@ -260,13 +260,18 @@ int recv_relay_buf_size = 0;
 
 static int csq_rssi = 0;
 static int csq_ber = 0;
+static int csq_record_count = 0;
 void at_csq_get(void){
     sscanf(new_line,"+CSQ: %d,%d",&csq_rssi,&csq_ber);
     printf("csq_rssi=%d, csq_ber=%d.\r\n",csq_rssi,csq_ber);
     if (csq_rssi > 0 && csq_rssi <=31)
     {
-        state_enter_last();
+        at_csq_return();
     }
+}
+void at_csq_return(void){
+    state_enter_last();
+    cmd[at_client_state].exec_this_count = csq_record_count;
 }
 
 static void at_client_recv_exec_init(void){
@@ -447,6 +452,10 @@ static void at_client_init(void){
 
 static int at_client_is_init = 0;
 void at_client_run(void){
+    
+
+    static unsigned int at_client_init_tick = 0;
+    static int at_client_init_tick_flag = 0;
     if (at_client_is_init == 0)
     {
         at_client_is_init = 1;
@@ -457,11 +466,27 @@ void at_client_run(void){
         //记录第一次last状态
         at_client_state_last = at_client_state_get();
 			
+            #if 0 //退出PPP的代码
 			//可能模块正处于PPP模式或者+++模式 先退出，代码自行设计
 			//抓包来的，只能说是能用，可以退出PPP
 			uint8_t LCP_Terminate_Request[] = {0x7E, 0xFF, 0x7D, 0x23, 0xC0, 0x21, 0x7D, 0x25, 0x7D, 0x24, 0x7D, 0x20, 0x7D, 0x30, 0x55, 0x73, 0x65, 0x72, 0x20, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0xBE, 0x8B, 0x7E};
 			at_client_port_output(LCP_Terminate_Request, sizeof(LCP_Terminate_Request));
+            #endif
+            //推出透传
+            at_client_port_output("+++", 3);
+            at_client_init_tick = AT_CLIENT_TICK_GET;
     }
+    if (at_client_init_tick_flag == 0)
+    {
+        //延时3秒往下执行
+        if (AT_CLIENT_TICK_GET - at_client_init_tick > 3000)
+        {
+            at_client_init_tick_flag = 1;
+        }else{
+            return;
+        }
+    }
+    
     
     //执行CMD命令, 返回的tick为下一次可执行的间隔
     unsigned int cmd_interval_tick = at_client_cmd_exec();
@@ -487,10 +512,13 @@ void at_client_run(void){
     if (USE_RELAY_STATE && RELAY_STATE == at_client_state){
         //非CMD模式
     }else{
-        //每5秒查询一下信号质量
+        //每5秒查询一下信号质量 20230612debug 重复查询信号质量会中断之前CMD执行的次数，导致之前执行的次数统计有所错乱，进行统计次数纠正
         static unsigned int csqTick = 0;
-        if ((AT_CLIENT_TICK_GET - csqTick > 5000 || csqTick == 0) && at_client_state > ATQCCID && at_client_state != ATCSQ)
+        //20230612debug 周期尽量长一点，别打断其他的命令响应
+        if ((AT_CLIENT_TICK_GET - csqTick > 1000*30 || csqTick == 0) && at_client_state > ATQCCID && at_client_state != ATCSQ)
         {
+            //20230612debug 记录当前CMD的执行次数
+            csq_record_count = cmd[at_client_state].exec_this_count;
             state_enter_ATCSQ();//这里会打断其他命令事件，只是在命令模式下使用影响不大，对事件有要求的自行加锁
             csqTick = AT_CLIENT_TICK_GET;
         }

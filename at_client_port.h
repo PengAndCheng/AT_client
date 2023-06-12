@@ -4,11 +4,10 @@
 
 #include "stdint.h"
 
-#include <rtthread.h>
 #include "app_board.h"
 
 //extern unsigned int SysTick_ms;
-#define AT_CLIENT_TICK_GET rt_tick_get()
+#define AT_CLIENT_TICK_GET app_tick_get()
 
 
 static inline int at_client_tick_timeout(unsigned int start_tick, unsigned int interval){
@@ -33,9 +32,9 @@ static inline unsigned int at_client_tick_Notimeout(unsigned int start_tick, uns
   }
 }
 
-#define AT_CLIENT_UART_INIT()                             USART0_INIT();
-#define AT_CLIENT_UART_SEND(data,datalen)                 USART0_send(data,datalen)
-#define AT_CLIENT_UART_SET_RECEIVE_CALLBACK_FUNCTION(fn)  USART0_set_receive_callback_function(fn);
+#define AT_CLIENT_UART_INIT()                             _4G_UART_INIT();
+#define AT_CLIENT_UART_SEND(data,datalen)                 _4G_UART_SEND(data,datalen)
+#define AT_CLIENT_UART_SET_RECEIVE_CALLBACK_FUNCTION(fn)  _4G_UART_SET_RECV_CB(fn);
 void at_client_port_input_loopQueue(uint8_t* data, int len);
 int at_client_port_take_byte(uint8_t* byte, unsigned int timeout);
 void at_client_port_output(uint8_t* data, int len);
